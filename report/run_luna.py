@@ -11,7 +11,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--tasks", nargs="+", default=["learn"])
     parser.add_argument("--results", default="results/luna-followup")
-    parser.add_argument("--skills", default="skills/luna-auto-v2")
+    parser.add_argument("--skills", default="report/generated-skills/luna-auto-v2")
     parser.add_argument("--recursion-limit", type=int, default=60)
     args = parser.parse_args()
     model = make_model()

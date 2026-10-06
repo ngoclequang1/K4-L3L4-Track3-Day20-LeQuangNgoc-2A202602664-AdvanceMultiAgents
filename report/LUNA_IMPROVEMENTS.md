@@ -35,12 +35,18 @@ meta(source, rows_in, rows_used), clean.csv với schema yêu cầu.
 **Chưa đạt toàn bộ lab** và chưa có bộ so sánh 18 lượt mới bằng Luna; không kết luận
 khả năng tổng quát hóa sang eval từ ba task học này.
 
-Skill cuối ở `skills/luna-auto-v2`: python-code-repair và log-file-triage.
+Skill cuối ở `report/generated-skills/luna-auto-v2`: python-code-repair và log-file-triage.
 Curator trả hai skill hợp lệ; không có skill dữ liệu bảng trong bộ cuối, vì vậy các quy ước
 reporting của data chưa được truyền đầy đủ. skills_read=2 của data là đọc hai skill hiện có,
-không có nghĩa nó đã đọc một skill tabular. V1 ở `skills/luna-auto` có tabular-analysis,
+không có nghĩa nó đã đọc một skill tabular. V1 ở `report/generated-skills/luna-auto` có tabular-analysis,
 nhưng skill đó chỉ nói giữ schema/đơn vị khi được chỉ định, không lưu đầy đủ quy ước đã học.
 Không ghép thủ công nội dung hoặc chèn các giá trị đáp án vào skill/runner để tăng điểm.
+
+Skill bổ sung ban đầu được tạo ở skills/luna-auto và skills/luna-auto-v2, đúng như
+skills_source lịch sử trong run.json. Kiểm tra cuối cho thấy verify_freeze kiểm tra
+toàn bộ skills/ nên các thư mục bổ sung đã chuyển sang report/generated-skills/,
+giữ nguyên bytes. Không sửa metadata lịch sử; hash bộ skill không đổi. Script chạy
+tiếp dùng vị trí mới, còn thư mục skills/ được khôi phục đúng trạng thái đã freeze.
 
 Cả model, cấu hình nhiệt độ, runtime, newline, skill và giới hạn bước đều thay đổi;
 do đó bảng trên chỉ mô tả cải thiện quan sát được, không tách riêng tác dụng của Luna.

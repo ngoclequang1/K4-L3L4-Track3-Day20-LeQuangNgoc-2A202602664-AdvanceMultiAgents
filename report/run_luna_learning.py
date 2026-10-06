@@ -8,7 +8,7 @@ from lab.runner import run_task
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--skills", default="skills/luna-auto")
+    parser.add_argument("--skills", default="report/generated-skills/luna-auto")
     parser.add_argument("--results", default="results/luna-learning-v4")
     parser.add_argument("--recursion-limit", type=int, default=40)
     args = parser.parse_args()
