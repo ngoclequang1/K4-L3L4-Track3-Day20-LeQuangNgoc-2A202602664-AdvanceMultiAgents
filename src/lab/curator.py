@@ -110,6 +110,10 @@ Rules:
 - Generalize: do not mention task ids, task-specific input filenames, functions, columns, answers, or numbers.
 - Preserve reusable organizational conventions stated in RULE feedback, including required output filenames,
   JSON keys, headers, money units, and test locations. These are conventions, not task-specific input details.
+- The review conventions may NOT be repeated in the new task or workspace README. Store their complete
+  reusable requirements in the skill itself: exact units, literal metadata keys/values, file/header formats,
+  row-count meanings, and minimum test/changelog counts. Do not weaken a learned rule to 'when specified',
+  'when required', 'follow conventions', or an example; those phrases lose the organizational memory.
 - Keep each convention scoped to its task type. Do not invent broader replacements or requirements.
 - Read each new task's specification for accepted error levels, missing-value sentinels, identifier fields,
   categorical spelling, and input format. Never hard-code these input details from the learning examples.
@@ -132,7 +136,12 @@ description: <when to use it>
 
 {chr(10).join(sections)}
 """
-    response = (model or make_model()).invoke(prompt)
+    selected_model = model if model is not None else make_model()
+    if getattr(selected_model, "model_name", None) == "gpt-6-luna":
+        selected_model = selected_model.model_copy(update={
+            "reasoning_effort": "none", "use_responses_api": False, "temperature": None,
+        })
+    response = selected_model.invoke(prompt)
     written = []
     for name, text in parse_skill_blocks(response.content):
         if len(written) >= max_skills:

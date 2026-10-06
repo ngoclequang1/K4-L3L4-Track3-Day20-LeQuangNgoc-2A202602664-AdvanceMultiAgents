@@ -1,5 +1,8 @@
 # Báo cáo Lab: Self evolving Agentic
 
+Báo cáo này giữ kết quả thí nghiệm gốc với gpt-4o-mini. Thí nghiệm cải thiện Luna
+được ghi riêng tại [LUNA_IMPROVEMENTS.md](LUNA_IMPROVEMENTS.md), không thay điểm hoặc tag freeze ở đây.
+
 ## 1. Thông tin nhóm và cấu hình
 
 | Họ tên | Mã sinh viên | Phần đóng góp |

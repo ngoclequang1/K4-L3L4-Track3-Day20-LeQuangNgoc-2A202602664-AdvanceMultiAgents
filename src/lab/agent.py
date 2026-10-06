@@ -54,6 +54,7 @@ def make_backend(sandbox: Path):
     env = {
         "PATH": path_separator.join((python_dir, "/usr/local/bin", "/usr/bin", "/bin")),
         "HOME": str(Path(sandbox).resolve()),
+        "PYTHONPATH": str((Path(sandbox) / "workspace").resolve()),
         "PYTHONDONTWRITEBYTECODE": "1",
     }
     return LocalShellBackend(
@@ -82,8 +83,49 @@ def build_agent(sandbox: Path, mode: str = "single", use_skills: bool = False, m
     if mode not in {"single", "subagents"}:
         raise ValueError(f"unknown agent mode: {mode}")
 
+    selected_model = model if model is not None else make_model()
+    # GPT-6 Luna requires explicit none for function tools on Chat Completions.
+    # Copy instead of mutating a caller-supplied model; other providers/fakes
+    # retain their original configuration.
+    if getattr(selected_model, "model_name", None) == "gpt-6-luna":
+        selected_model = selected_model.model_copy(update={
+            "reasoning_effort": "none",
+            "use_responses_api": False,
+            "temperature": None,
+        })
+
     kwargs = {}
     prompt = BASE_PROMPT
+    # Tool recovery advice is generic: no task answers, checker access, or
+    # changes to the provided system prompts/auto-generated skills.
+    from langchain.agents.middleware import wrap_tool_call
+    from langchain_core.messages import ToolMessage
+
+    @wrap_tool_call
+    def recover_tool_errors(request, handler):
+        response = handler(request)
+        if not isinstance(response, ToolMessage) or not isinstance(response.content, str):
+            return response
+        text = response.content
+        name = request.tool_call.get("name")
+        advice = ""
+        if name == "edit_file" and "String not found" in text:
+            advice = (
+                "Read the current file again before editing; the old_string must match its CURRENT content exactly. "
+                "Do not repeat the failed edit or edit the same file in parallel."
+            )
+        elif name == "execute" and ("SyntaxError" in text or "ModuleNotFoundError" in text):
+            advice = (
+                "Do not repeat this failing command. For multi-statement Python, write a .py file with write_file "
+                "and execute python workspace/<script>.py. Compound statements such as with/for cannot follow "
+                "a semicolon in python -c. Use standard-library modules when a dependency is unavailable. "
+                "For workspace package tests use: cd workspace && python -m pytest."
+            )
+        if not advice:
+            return response
+        return response.model_copy(update={"content": text + "\n\nTool recovery: " + advice})
+
+    kwargs["middleware"] = [recover_tool_errors]
     if mode == "subagents":
         kwargs["subagents"] = [
             {**sub, "system_prompt": sub["system_prompt"] + " " + PATHS_NOTE}
@@ -95,7 +137,7 @@ def build_agent(sandbox: Path, mode: str = "single", use_skills: bool = False, m
         prompt += SKILLS_NOTE
 
     return create_deep_agent(
-        model=model or make_model(),
+        model=selected_model,
         system_prompt=prompt,
         backend=make_backend(sandbox),
         **kwargs,

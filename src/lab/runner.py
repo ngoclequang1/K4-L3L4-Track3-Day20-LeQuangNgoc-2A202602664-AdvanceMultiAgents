@@ -6,6 +6,7 @@ Chạy thật:   python -m lab.runner --condition baseline --tasks learn
 """
 import argparse
 import json
+import os
 import re
 import shutil
 import tempfile
@@ -17,6 +18,7 @@ from langchain_core.callbacks import UsageMetadataCallbackHandler
 from langchain_core.messages import AIMessage, ToolMessage
 
 from .agent import build_agent
+from .model import make_model
 from .grading import grade                                                      # có sẵn
 from .tasks import ROOT, get_task, hash_dir, list_tasks, prepare_sandbox         # có sẵn
 
@@ -53,7 +55,7 @@ def render_trace(messages) -> str:
     return "\n\n".join(parts)
 
 
-def run_task(task_id: str, condition: str, results_dir="results", model=None, recursion_limit: int = 60) -> dict:
+def run_task(task_id: str, condition: str, results_dir="results", model=None, recursion_limit: int = 60, *, skills_source=None) -> dict:
     """Chạy MỘT tác vụ dưới MỘT điều kiện, chấm điểm, ghi kết quả, và trả về bản ghi (record).
 
     Ghi vào: <results_dir>/<condition>/<task_id>/run.json và trace.md  (trace.md = render_trace(messages)).
@@ -74,10 +76,16 @@ def run_task(task_id: str, condition: str, results_dir="results", model=None, re
     """
     if condition not in CONDITIONS:
         raise ValueError(f"unknown condition: {condition}")
+    if skills_source is not None and (
+        condition != "skills-auto" or Path(results_dir).resolve() == (ROOT / "results").resolve()
+    ):
+        raise ValueError("alternate skills require skills-auto and a separate results directory")
 
     cfg = CONDITIONS[condition]
     task = get_task(task_id)
     skills_dir = ROOT / cfg["skills_dir"] if cfg["skills_dir"] else None
+    if skills_source is not None:
+        skills_dir = Path(skills_source).resolve()
     out = Path(results_dir) / condition / task_id
     out.mkdir(parents=True, exist_ok=True)
     sandbox = Path(tempfile.mkdtemp(prefix=f"lab-{task_id}-"))
@@ -88,6 +96,13 @@ def run_task(task_id: str, condition: str, results_dir="results", model=None, re
         "error": None,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "recursion_limit": recursion_limit,
+        "runner_revision": "luna-runtime-v3",
+        "tokens": {"input": 0, "output": 0, "total": 0},
+        "tool_calls": 0,
+        "subagent_calls": 0,
+        "skills_read": 0,
+        "skills_modified": False,
+        "final_message": "",
     }
     messages = []
     final = ""
@@ -95,13 +110,33 @@ def run_task(task_id: str, condition: str, results_dir="results", model=None, re
 
     try:
         prepare_sandbox(task, sandbox, skills_dir)
+        # A Windows checkout has CRLF whereas the supplied original-test hashes
+        # were produced from LF sources. Use canonical Python text in the Linux
+        # sandbox BEFORE agent execution, without touching the repository inputs.
+        normalized = []
+        if os.name != "nt":
+            for source in (sandbox / "workspace").rglob("*.py"):
+                original = source.read_bytes()
+                canonical = original.replace(b"\r\n", b"\n")
+                if canonical != original:
+                    source.write_bytes(canonical)
+                    normalized.append(str(source.relative_to(sandbox)))
+        record["normalized_python_files"] = normalized
+        record["skills_source"] = str(skills_dir) if skills_dir is not None else None
         skills_before = hash_dir(sandbox / "skills")
         record["skills_sha256"] = skills_before
+        selected_model = model if model is not None else make_model()
+        record["model"] = getattr(selected_model, "model_name", type(selected_model).__name__)
+        record["temperature"] = getattr(selected_model, "temperature", None)
+        if record["model"] == "gpt-6-luna":
+            record["api"] = "chat-completions"
+            record["reasoning_effort"] = "none"
+            record["temperature"] = None
         agent = build_agent(
             sandbox,
             mode=cfg["mode"],
             use_skills=skills_dir is not None,
-            model=model,
+            model=selected_model,
         )
         usage = UsageMetadataCallbackHandler()
         started = time.perf_counter()
@@ -112,7 +147,7 @@ def run_task(task_id: str, condition: str, results_dir="results", model=None, re
                 stream_mode="values",
             ):
                 messages = result.get("messages", [])
-            if messages:
+            if messages and isinstance(messages[-1], AIMessage) and not messages[-1].tool_calls:
                 final = str(messages[-1].content)
         except Exception as exc:  # noqa: BLE001
             record["error"] = f"{type(exc).__name__}: {exc}"
@@ -140,6 +175,13 @@ def run_task(task_id: str, condition: str, results_dir="results", model=None, re
         record["skills_modified"] = hash_dir(sandbox / "skills") != skills_before
         record["final_message"] = final
         record.update(grade(task, sandbox / "workspace"))
+        (out / "trace.md").write_text(render_trace(messages), encoding="utf-8")
+    except Exception as exc:  # also preserve build/setup/grading failures
+        record["error"] = f"{type(exc).__name__}: {exc}"
+        record["seconds"] = round(time.perf_counter() - started, 1)
+        record.setdefault("skills_sha256", hash_dir(sandbox / "skills"))
+        if "checks" not in record:
+            record.update(grade(task, sandbox / "workspace"))
         (out / "trace.md").write_text(render_trace(messages), encoding="utf-8")
     finally:
         shutil.rmtree(sandbox, ignore_errors=True)
