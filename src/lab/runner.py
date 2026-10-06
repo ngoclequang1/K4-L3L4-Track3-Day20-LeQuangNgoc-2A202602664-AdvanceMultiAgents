@@ -6,10 +6,17 @@ Chạy thật:   python -m lab.runner --condition baseline --tasks learn
 """
 import argparse
 import json
+import re
+import shutil
+import tempfile
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 
+from langchain_core.callbacks import UsageMetadataCallbackHandler
 from langchain_core.messages import AIMessage, ToolMessage
 
+from .agent import build_agent
 from .grading import grade                                                      # có sẵn
 from .tasks import ROOT, get_task, hash_dir, list_tasks, prepare_sandbox         # có sẵn
 
@@ -65,7 +72,80 @@ def run_task(task_id: str, condition: str, results_dir="results", model=None, re
     Lỗi khi chạy tác tử KHÔNG được làm chương trình dừng: ghi vào `error` và vẫn chấm điểm.
     Sandbox là thư mục tạm NGOÀI kho mã nguồn và phải được xóa sau khi chạy.
     """
-    raise NotImplementedError("TODO 1: cài đặt run_task (xem guides/pseudocode/03_runner.md)")
+    if condition not in CONDITIONS:
+        raise ValueError(f"unknown condition: {condition}")
+
+    cfg = CONDITIONS[condition]
+    task = get_task(task_id)
+    skills_dir = ROOT / cfg["skills_dir"] if cfg["skills_dir"] else None
+    out = Path(results_dir) / condition / task_id
+    out.mkdir(parents=True, exist_ok=True)
+    sandbox = Path(tempfile.mkdtemp(prefix=f"lab-{task_id}-"))
+    record = {
+        "task": task.id,
+        "condition": condition,
+        "role": task.role,
+        "error": None,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "recursion_limit": recursion_limit,
+    }
+    messages = []
+    final = ""
+    started = time.perf_counter()
+
+    try:
+        prepare_sandbox(task, sandbox, skills_dir)
+        skills_before = hash_dir(sandbox / "skills")
+        record["skills_sha256"] = skills_before
+        agent = build_agent(
+            sandbox,
+            mode=cfg["mode"],
+            use_skills=skills_dir is not None,
+            model=model,
+        )
+        usage = UsageMetadataCallbackHandler()
+        started = time.perf_counter()
+        try:
+            for result in agent.stream(
+                {"messages": [{"role": "user", "content": task.instruction}]},
+                config={"callbacks": [usage], "recursion_limit": recursion_limit},
+                stream_mode="values",
+            ):
+                messages = result.get("messages", [])
+            if messages:
+                final = str(messages[-1].content)
+        except Exception as exc:  # noqa: BLE001
+            record["error"] = f"{type(exc).__name__}: {exc}"
+
+        record["seconds"] = round(time.perf_counter() - started, 1)
+        totals = {"input": 0, "output": 0, "total": 0}
+        for item in usage.usage_metadata.values():
+            totals["input"] += int(item.get("input_tokens", 0))
+            totals["output"] += int(item.get("output_tokens", 0))
+            totals["total"] += int(item.get("total_tokens", 0))
+        record["tokens"] = totals
+
+        calls = [tc for msg in messages if isinstance(msg, AIMessage) for tc in msg.tool_calls]
+        record["tool_calls"] = len(calls)
+        record["subagent_calls"] = sum(tc.get("name") == "task" for tc in calls)
+        skill_names = set()
+        for tc in calls:
+            if tc.get("name") != "read_file":
+                continue
+            file_path = str(tc.get("args", {}).get("file_path", "")).replace("\\", "/")
+            match = re.search(r"(?:^|/)skills/([^/]+)/", file_path.lstrip("/"))
+            if match:
+                skill_names.add(match.group(1))
+        record["skills_read"] = len(skill_names)
+        record["skills_modified"] = hash_dir(sandbox / "skills") != skills_before
+        record["final_message"] = final
+        record.update(grade(task, sandbox / "workspace"))
+        (out / "trace.md").write_text(render_trace(messages), encoding="utf-8")
+    finally:
+        shutil.rmtree(sandbox, ignore_errors=True)
+
+    (out / "run.json").write_text(json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")
+    return record
 
 
 def main(argv=None):
