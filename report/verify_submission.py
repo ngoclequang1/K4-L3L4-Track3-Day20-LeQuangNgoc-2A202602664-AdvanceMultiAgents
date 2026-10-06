@@ -10,7 +10,7 @@ from lab.tasks import ROOT
 
 
 def original(relative):
-    result = subprocess.run(["git", "show", f"HEAD:{relative}"], cwd=ROOT, capture_output=True, text=True, check=True)
+    result = subprocess.run(["git", "show", f"freeze~2:{relative}"], cwd=ROOT, capture_output=True, text=True, check=True)
     return ast.parse(result.stdout)
 
 
@@ -35,7 +35,7 @@ def main():
     for relative, names in protected.items():
         assert nodes(original(relative), names) == nodes(ast.parse((ROOT / relative).read_text(encoding="utf-8")), names), relative
     result = subprocess.run(
-        ["git", "diff", "--exit-code", "HEAD", "--", "tests", "tasks", "scripts", "src/lab/model.py",
+        ["git", "diff", "--exit-code", "freeze~2", "--", "tests", "tasks", "scripts", "src/lab/model.py",
          "src/lab/tasks.py", "src/lab/grading.py", "src/lab/testing.py", "src/lab/compare.py"],
         cwd=ROOT, capture_output=True, text=True,
     )

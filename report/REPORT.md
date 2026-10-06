@@ -1,7 +1,5 @@
 # Báo cáo Lab: Self evolving Agentic
 
-> Sao chép tệp này thành `report/REPORT.md` (đã làm ở Phần 0) và điền dần qua các Phần của lab. Xóa các dòng hướng dẫn dạng trích dẫn (bắt đầu bằng `>`). Văn phong kỹ thuật, ngắn gọn, mọi nhận định đi kèm số liệu hoặc bằng chứng. Trong buổi học: điền mục 1 đến 7 (bản nháp). Sau buổi học: hoàn thiện mục 8 đến 10.
-
 ## 1. Thông tin nhóm và cấu hình
 
 | Họ tên | Mã sinh viên | Phần đóng góp |
@@ -9,13 +7,11 @@
 | Lê Quang Ngọc | 2A202602664 | Cài đặt harness, thực nghiệm và phân tích báo cáo |
 
 - Mô hình: `openai:gpt-4o-mini`; nhiệt độ 0; recursion limit 40 thống nhất cho thí nghiệm mới. Runner streaming giữ trace cuối khi gặp lỗi (mở rộng được phép trong pseudo-code 03).
-- Phiên bản Deep Agents (`pip show deepagents`), hệ điều hành, chạy trực tiếp hay trong Docker: Deep Agents 0.7.21; Windows 11 host; chạy agent trong Docker Linux.
-- Số lần chạy tác vụ đã dùng / ngân sách:
-- Commit của tag `freeze`:
+- Phiên bản Deep Agents (`pip show deepagents`), hệ điều hành, chạy trực tiếp hay trong Docker: Deep Agents 0.7.21; Python 3.12.15; Windows host; chạy agent trong Docker Linux.
+- Số lần chạy tác vụ đã dùng / ngân sách: 18 kết quả chính + 3 development + 5 lượt lỗi đầu được lưu trước retry = 26 lượt mới; thêm 5 lượt cũ được lưu riêng, tổng 31 bản ghi. Tổng token ghi nhận 2.497.724, không gồm curator/kiểm tra kết nối/lượt bị ngắt không có bản ghi; đây không phải tổng hóa đơn API. Curator gọi 3 lần. Người dùng không đặt ngân sách số token cụ thể.
+- Commit của tag `freeze`: `6e6014e22de04ae977f4f84ec0d25b9b25f3c94f`; hypotheses ở `6379aee` trước freeze. Không đổi skill sau tag.
 
 ## 2. Giả thuyết (commit TRƯỚC tag `freeze`, Phần 4.0)
-
-> Dự đoán điều kiện nào đạt điểm cao nhất trên **tác vụ đánh giá** và vì sao. Nêu căn cứ từ phân loại lỗi (mục 4) và từ tài liệu tham khảo. Điền cả ba dòng; `verify_freeze.py` kiểm tra điều này.
 
 - H1 (subagents so với baseline): Dự đoán subagents không cải thiện đồng đều điểm eval; token có thể tăng khi thực sự giao việc. Learning code-learn đạt 3/10 so với baseline 4/10 và không gọi subagent. Căn cứ: GUIDE 2.3 và pseudo-code 02 về chi phí và cô lập ngữ cảnh.
 - H2 (skills-auto so với baseline): Dự đoán skill giúp một phần check quy ước lặp lại nhưng không bảo đảm sửa lỗi tính toán hoặc cải thiện mọi tác vụ. Baseline learning bỏ sót cả 9 check rule_. Căn cứ: pseudo-code 04/05 về SkillsBench và việc đọc/làm theo skill.
@@ -30,8 +26,6 @@ Giả thuyết được viết trước khi chạy/đọc điểm eval. Đề ev
 3. Từ `task`: “Each invocation is stateless by default: the agent sees only the prompt you give it”. Từ `execute`: “You MUST avoid using search commands like find and grep. Instead use the grep, glob tools to search.”
 
 ## 4. Đường cơ sở và phân loại lỗi (Phần 2.2)
-
-> Chỉ dùng tác vụ học. Mỗi dòng là một check thất bại.
 
 | Tác vụ | Check thất bại | Nhóm lỗi (A-G) | Bằng chứng từ detail/vết |
 |---|---|---|---|
@@ -96,26 +90,53 @@ Development: code-learn 3/10 (47.456 token), data-learn 0/8 (198.550 token, Grap
 
 ## 7. Kết quả so sánh (Phần 4.3, 4.4)
 
-> Dán nội dung `report/table.md` và kết quả `python scripts/check_breakdown.py`. Nêu các lần chạy có `error` hoặc `skills_modified = true` (nếu có) và cách xử lý.
+| Task | baseline | subagents | skills-auto |
+|---|---|---|---|
+| code-learn | 4/10 | 3/10 | 2/10 |
+| data-learn | 0/8 | 1/8 | 0/8 |
+| logs-learn | 1/9 | 0/9 | 0/9 |
+| code-eval | 1/11 | 1/11 | 2/11 |
+| data-eval | 0/9 | 1/9 | 3/9 |
+| logs-eval | 1/10 | 1/10 | 1/10 |
+| **Mean score - learning tasks** | 0.17 | 0.14 | 0.07 |
+| **Mean score - evaluation tasks** | 0.06 | 0.10 | 0.21 |
+| **Mean tokens per run** | 46,204 | 57,093 | 60,419 |
+| **Runs that read a skill** | 0/6 | 0/6 | 0/6 |
+
+Phân rã check (output scripts/check_breakdown.py, bỏ khoảng trắng cuối dòng):
 
 ```text
-(dán bảng ở đây)
+condition     role    technical  house rules  mean tokens  read a skill
+baseline      eval      2/18         0/12          58,707      0/3
+baseline      learn     5/18         0/9           33,702      0/3
+subagents     eval      3/18         0/12          69,244      0/3
+subagents     learn     4/18         0/9           44,942      0/3
+skills-auto   eval      6/18         0/12          30,422      0/3
+skills-auto   learn     2/18         0/9           90,416      0/3
 ```
+
+Có 5 lượt chính đầu gặp GraphRecursionError, mỗi lượt được retry đúng một lần với cùng model, nhiệt độ và limit 40. Bảng chính dùng lượt retry, không chọn lượt điểm cao nhất; bản đầu giữ ở results/official-first-pass và log đầy đủ ở results/retry-log.json.
+
+| Điều kiện / task | Điểm lượt đầu → retry | Lỗi sau retry |
+|---|---|---|
+| baseline / code-eval | 1/11 → 1/11 | GraphRecursionError (40) |
+| baseline / data-eval | 0/9 → 0/9 | Không |
+| subagents / code-eval | 1/11 → 1/11 | Không |
+| skills-auto / code-eval | 0/11 → 2/11 | Không |
+| skills-auto / data-learn | 0/8 → 0/8 | GraphRecursionError (40) |
+
+Không tăng limit và không retry tiếp để tránh chi phí/vòng lặp không giới hạn. Hai lỗi còn lại được giữ nguyên trong kết quả; không khẳng định agent đã hoàn thành các task đó. Development data-learn cũng có lỗi, được giữ nguyên để đánh giá nhiễu, không dùng thay kết quả chính. Tất cả 18 lượt chính có skills_modified=false; verify_freeze: checked 6 runs of skill conditions: OK. Test harness: 29 passed. Kiểm tra bổ sung: protected code unchanged, 1 valid skill, 18 complete official runs, no API key pattern found. “Complete official runs” nghĩa là đủ bản ghi/trace/check cho 18 ô, không có nghĩa mọi tác vụ đạt điểm tối đa.
 
 ## 8. Phân tích
 
-> Trả lời từng câu bằng số liệu từ mục 7 và bằng chứng từ vết. Kết quả âm hoặc không có khác biệt vẫn hợp lệ nếu được phân tích tốt.
-
-1. So với `baseline`, điều kiện nào cải thiện điểm tác vụ **học**? Điều kiện nào cải thiện điểm tác vụ **đánh giá**? Có điều kiện nào cải thiện tác vụ học nhưng không cải thiện tác vụ đánh giá? Nếu có, đó là dấu hiệu gì?
-2. Tách điểm thành check kỹ thuật và check quy ước (`rule_`). Skill do curator sinh giúp nhóm check nào? Check quy ước **mới** của tác vụ đánh giá có được skill giúp không, và vì sao?
-3. Dựa vào vết và `skills_read`, giải thích một check mà skill giúp đạt và một check mà skill không giúp (skill chưa được đọc, đọc nhưng không làm theo, skill thiếu hoặc sai).
-4. Chi phí: so sánh số token trung bình giữa các điều kiện. Điều kiện nào có hiệu quả tốt nhất theo điểm trên mỗi token? Đa tác tử có đáng chi phí trong thí nghiệm này không?
-5. Có dấu hiệu rò rỉ dữ liệu hoặc quá khớp nào trong skill sinh ra không? Nhóm đã phòng tránh như thế nào?
-6. Nhiễu: so sánh điểm tác vụ học của cùng bộ skill ở Phần 3.4 (đã sao lưu) và sau đóng băng. Chênh lệch bao nhiêu? Nó cho biết điều gì về độ tin cậy của các chênh lệch trong bảng ở mục 7?
+1. Learning: baseline 0,1704, subagents 0,1417, skills-auto 0,0667; không điều kiện nào cải thiện. Eval: baseline 0,0636, subagents 0,1007, skills-auto 0,2051; tăng tương ứng 0,0370 và 0,1414. Không có mẫu “learning tăng nhưng eval không tăng”; kết quả ngược H3, H1 chỉ được ủng hộ một phần (không tăng đồng đều). Điểm eval cao hơn không chứng minh tác dụng skill vì không lượt nào đọc skill và retry có thay đổi điểm code-eval.
+2. Learning kỹ thuật: baseline 5/18, subagents 4/18, skills-auto 2/18; eval: 2/18, 3/18, 6/18. Quy ước đều 0/9 learning và 0/12 eval. Không có bằng chứng hỗ trợ H2. Ba rule mới rule_version_bump, rule_sorted_keys_format và rule_source_line đều không đạt; code-repair không chứa chúng và không được đọc. Học quy ước cũ không tự suy ra quy ước mới.
+3. Không thể đưa ra một check được **skill giúp đạt** một cách trung thực: skills_read=0 ở cả 6 lượt chính. Ví dụ tương quan: parse_price_all_formats ở skills-auto/code-learn đạt trong khi baseline trượt, phù hợp mục xử lý accounting trong skill; nhưng trace không read_file skill, nên không quy kết nhân quả. rule_type_hints vẫn trượt dù skill nhắc rõ, thuộc trường hợp skill chưa được đọc. Trace data-eval tính bằng Python chuẩn đạt top_category, missing_total_orders, duplicate_events_removed, nhưng không chuyển timestamp sang UTC trước lọc tháng nên các metric tháng sai; đây là hành vi thực thi, không phải bằng chứng skill được áp dụng.
+4. Token trung bình trên 6 lượt: baseline 46.204,7; subagents 57.093,5 (+23,57%); skills-auto 60.419,3 (+30,76%). Chỉ số mean score / mean tokens × 1.000.000 lần lượt 2,532; 2,122; 2,249: baseline tốt nhất theo định nghĩa này trên toàn bộ task. Riêng eval, skills-auto có mean score cao nhất và mean tokens thấp nhất (30.422), nhưng không đủ bằng chứng nhân quả. Chi phí đa tác tử chưa được bù bằng cải thiện ổn định trong mẫu này; vòng lặp/lượt lỗi ảnh hưởng mạnh token. Bảng trung bình không gồm chi phí lượt đầu đã archive; tổng token ghi nhận ở mục 1 có gồm chúng.
+5. Curator chỉ nhận learning feedback và trace; skill cuối không có đáp án hoặc id task eval, không chỉnh tay và không đổi sau freeze. Tám bản bị loại vì hướng dẫn sai/thiếu hoặc cố định định dạng, sentinel, mức log của learning; bản cuối vẫn thiên về giá tiền nên có nguy cơ quá khớp miền. Đề eval Markdown từng được đọc khi lập checklist là hạn chế thực tế, không che giấu; việc không đưa eval vào curator và đóng băng trước khi chấm chỉ giảm, không xóa hạn chế này.
+6. Cùng skill: development code-learn 3/10 → sau freeze 2/10; data-learn 0/8 → 0/8; logs-learn 0/9 → 0/9. Mean learning 0,1000 → 0,0667, giảm 0,0333. Hash skill không đổi; dao động ít nhất một check code là bằng chứng không nên diễn giải mọi chênh lệch nhỏ như cải tiến. Hai lượt data đều chạm limit (lượt chính đã retry), nên đây không phải ước lượng nhiễu thuần hay độ tin cậy thống kê.
 
 ## 9. Hạn chế và tính hợp lệ
-
-> Nêu ít nhất 3 hạn chế và ảnh hưởng của từng hạn chế đến kết luận (ví dụ: chỉ 3 tác vụ mỗi vai trò, mỗi cấu hình chạy một lần, nhiễu của mô hình, tác vụ do giảng viên thiết kế sẵn quy ước, chỉ một mô hình).
 
 1. Chỉ ba tác vụ mỗi vai trò, một lượt chính cho mỗi cấu hình: trung bình dễ bị chi phối bởi một bài; nhiệt độ 0 không loại bỏ nhiễu. Lặp learning với cùng skill chỉ cho dao động quan sát được, không phải khoảng tin cậy thống kê.
 2. Chỉ một model gpt-4o-mini và giới hạn 40: kết luận không suy rộng sang model mạnh hơn hoặc ngân sách lớn hơn. Trace chỉ có luồng chính và mỗi khối bị cắt ở 1.500 ký tự; token có gồm subagent nhưng tool calls không gồm luồng bên trong.
@@ -124,10 +145,10 @@ Development: code-learn 3/10 (47.456 token), data-learn 0/8 (198.550 token, Grap
 
 ## 10. Kết luận
 
-> Tối đa 5 câu. Chỉ khẳng định điều số liệu hỗ trợ. Nêu một đề xuất cải tiến tiếp theo.
+Trong mẫu này, skills-auto có điểm eval cao nhất (0,2051), nhưng mọi lượt đều không đọc skill nên chưa chứng minh lợi ích self-evolving. Subagents tăng nhẹ điểm eval nhưng giảm learning và tăng token trung bình 23,57%. Cả ba điều kiện không đạt check quy ước nào, và hai kết quả chính vẫn chạm limit sau retry. Bước tiếp theo là thiết kế một thí nghiệm mới kiểm tra trigger đọc skill, đối chiếu một model mạnh hơn và lặp nhiều lượt với ngân sách cố định; không sửa bộ skill đã freeze của thí nghiệm này.
 
 ## Phụ lục
 
 - Lệnh đã chạy (theo thứ tự): xem [RUNBOOK.md](RUNBOOK.md). Kết quả cũ nằm ở results/previous-attempt; không tham gia bảng chính mới.
-- Thử thách mở rộng (nếu có): hướng chọn, kết quả, nhận xét.
-- Ghi chú khác:
+- Không thực hiện thử thách mở rộng ngoài phạm vi bắt buộc.
+- Checklist bàn giao: hoàn thiện TODO harness; test 29/29; curator và development có archive; hypotheses trước freeze; đủ 18 ô chính; xác minh freeze; bảng và phân rã check; báo cáo 10 mục. Test/checker/task gốc không thay đổi. Hai lỗi runtime còn lại được công khai ở mục 7.

@@ -1,0 +1,47 @@
+[
+  {
+    "condition": "baseline",
+    "task": "code-eval",
+    "first_attempt": "results/official-first-pass/baseline/code-eval",
+    "first_error": "GraphRecursionError: Recursion limit of 40 reached without hitting a stop condition. You can increase the limit by setting the `recursion_limit` config key.\nFor troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
+    "retry_error": "GraphRecursionError: Recursion limit of 40 reached without hitting a stop condition. You can increase the limit by setting the `recursion_limit` config key.\nFor troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
+    "first_score": 0.09090909090909091,
+    "retry_score": 0.09090909090909091
+  },
+  {
+    "condition": "baseline",
+    "task": "data-eval",
+    "first_attempt": "results/official-first-pass/baseline/data-eval",
+    "first_error": "GraphRecursionError: Recursion limit of 40 reached without hitting a stop condition. You can increase the limit by setting the `recursion_limit` config key.\nFor troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
+    "retry_error": null,
+    "first_score": 0.0,
+    "retry_score": 0.0
+  },
+  {
+    "condition": "subagents",
+    "task": "code-eval",
+    "first_attempt": "results/official-first-pass/subagents/code-eval",
+    "first_error": "GraphRecursionError: Recursion limit of 40 reached without hitting a stop condition. You can increase the limit by setting the `recursion_limit` config key.\nFor troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
+    "retry_error": null,
+    "first_score": 0.09090909090909091,
+    "retry_score": 0.09090909090909091
+  },
+  {
+    "condition": "skills-auto",
+    "task": "code-eval",
+    "first_attempt": "results/official-first-pass/skills-auto/code-eval",
+    "first_error": "GraphRecursionError: Recursion limit of 40 reached without hitting a stop condition. You can increase the limit by setting the `recursion_limit` config key.\nFor troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
+    "retry_error": null,
+    "first_score": 0.0,
+    "retry_score": 0.18181818181818182
+  },
+  {
+    "condition": "skills-auto",
+    "task": "data-learn",
+    "first_attempt": "results/official-first-pass/skills-auto/data-learn",
+    "first_error": "GraphRecursionError: Recursion limit of 40 reached without hitting a stop condition. You can increase the limit by setting the `recursion_limit` config key.\nFor troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
+    "retry_error": "GraphRecursionError: Recursion limit of 40 reached without hitting a stop condition. You can increase the limit by setting the `recursion_limit` config key.\nFor troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
+    "first_score": 0.0,
+    "retry_score": 0.0
+  }
+]
